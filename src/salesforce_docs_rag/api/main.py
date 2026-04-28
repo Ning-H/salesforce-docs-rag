@@ -3,8 +3,19 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI
 
-from salesforce_docs_rag.api.dependencies import embedding_provider, vector_store
-from salesforce_docs_rag.api.schemas import HealthResponse, QueryRequest, QueryResponse
+from salesforce_docs_rag.answering import AnswerSynthesizer
+from salesforce_docs_rag.api.dependencies import (
+    answer_synthesizer,
+    embedding_provider,
+    vector_store,
+)
+from salesforce_docs_rag.api.schemas import (
+    AnswerRequest,
+    AnswerResponse,
+    HealthResponse,
+    QueryRequest,
+    QueryResponse,
+)
 from salesforce_docs_rag.config import get_settings
 from salesforce_docs_rag.embeddings.base import EmbeddingProvider
 from salesforce_docs_rag.logging import configure_logging
@@ -33,6 +44,7 @@ def health() -> HealthResponse:
         status="ok",
         vector_store="weaviate",
         embedding_provider=settings.embedding_provider,
+        answer_provider=settings.answer_provider,
     )
 
 
@@ -45,3 +57,21 @@ async def query(
     query_vector = (await embedder.embed([request.query]))[0]
     results = store.search(query_vector=query_vector, top_k=request.top_k, filters=request.filters)
     return QueryResponse(query=request.query, results=results)
+
+
+@app.post("/answer", response_model=AnswerResponse)
+async def answer(
+    request: AnswerRequest,
+    embedder: Annotated[EmbeddingProvider, Depends(embedding_provider)],
+    store: Annotated[WeaviateVectorStore, Depends(vector_store)],
+    synthesizer: Annotated[AnswerSynthesizer, Depends(answer_synthesizer)],
+) -> AnswerResponse:
+    query_vector = (await embedder.embed([request.query]))[0]
+    results = store.search(query_vector=query_vector, top_k=request.top_k, filters=request.filters)
+    answer_text, citations = await synthesizer.answer(request.query, results)
+    return AnswerResponse(
+        query=request.query,
+        answer=answer_text,
+        citations=citations,
+        retrieved_results=results,
+    )

@@ -57,6 +57,19 @@ curl -X POST http://localhost:8000/query \
   }'
 ```
 
+## Example Grounded Answer
+
+```bash
+curl -X POST http://localhost:8000/answer \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I write Apex tests?",
+    "top_k": 3
+  }'
+```
+
+`/answer` retrieves Salesforce documentation chunks first, then returns a grounded answer with citations. By default it uses deterministic local synthesis; set `ANSWER_PROVIDER=openai` and `OPENAI_API_KEY` for LLM-generated answers.
+
 ## Repository Layout
 
 - `src/salesforce_docs_rag/crawler`: HTML extraction, URL classification, Scrapy item models.

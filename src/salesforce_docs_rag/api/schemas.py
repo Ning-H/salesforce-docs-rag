@@ -14,7 +14,25 @@ class QueryResponse(BaseModel):
     results: list[SearchResult]
 
 
+class Citation(BaseModel):
+    title: str
+    source_url: str
+    section_path: list[str]
+
+
+class AnswerRequest(QueryRequest):
+    pass
+
+
+class AnswerResponse(BaseModel):
+    query: str
+    answer: str
+    citations: list[Citation]
+    retrieved_results: list[SearchResult]
+
+
 class HealthResponse(BaseModel):
     status: str
     vector_store: str
     embedding_provider: str
+    answer_provider: str

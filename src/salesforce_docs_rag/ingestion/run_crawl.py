@@ -2,6 +2,7 @@ import json
 import sys
 from pathlib import Path
 from urllib import request
+from urllib.parse import urljoin
 
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
@@ -65,29 +66,77 @@ def main() -> None:
 
 def crawl_salesforce_docs_api(seed_urls: list[str], output_path: Path, max_pages: int) -> int:
     documents: list[RawDocument] = []
-    for url in seed_urls[:max_pages]:
-        payload = _fetch_json(url)
-        content = payload.get("content") or ""
-        title = payload.get("title") or payload.get("doc_title") or "Salesforce Documentation"
-        document = extract_document(url, f"<main><h1>{title}</h1>{content}</main>")
-        if document is None:
-            continue
-        version = payload.get("version") or {}
-        document.release_version = version.get("version_text") or document.release_version
-        document.metadata.update(
-            {
-                "content_document_id": payload.get("content_document_id"),
-                "deliverable": payload.get("deliverable"),
-                "pdf_url": payload.get("pdf_url"),
-            }
-        )
-        documents.append(document)
+    seen_pages: set[str] = set()
+    for guide_url in seed_urls:
+        guide_payload = _fetch_json(guide_url)
+        for page in _iter_guide_pages(guide_payload):
+            if len(documents) >= max_pages:
+                return write_jsonl(output_path, documents)
+            if page["content_api_url"] in seen_pages:
+                continue
+            seen_pages.add(page["content_api_url"])
+            page_payload = _fetch_json(page["content_api_url"])
+            content = page_payload.get("content") or ""
+            title = page_payload.get("title") or page["title"]
+            html = f"<main><h1>{title}</h1>{content}</main>"
+            document = extract_document(page["source_url"], html)
+            if document is None:
+                continue
+            version = guide_payload.get("version") or {}
+            document.release_version = version.get("version_text") or document.release_version
+            document.metadata.update(
+                {
+                    "content_document_id": page_payload.get("id") or page["href"],
+                    "deliverable": guide_payload.get("deliverable"),
+                    "guide_title": guide_payload.get("doc_title") or guide_payload.get("title"),
+                    "pdf_url": guide_payload.get("pdf_url"),
+                }
+            )
+            documents.append(document)
     return write_jsonl(output_path, documents)
 
 
 def _fetch_json(url: str) -> dict:
     with request.urlopen(url, timeout=30) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def _iter_guide_pages(guide_payload: dict) -> list[dict[str, str]]:
+    deliverable = guide_payload["deliverable"]
+    version = guide_payload["version"]
+    language = guide_payload["language"]
+    doc_version = version["doc_version"]
+    version_url = version["version_url"]
+    locale = language["locale"]
+
+    pages: list[dict[str, str]] = []
+    for node in _walk_toc(guide_payload.get("toc") or []):
+        href = ((node.get("a_attr") or {}).get("href") or "").split("#", 1)[0]
+        if not href or not href.endswith(".htm"):
+            continue
+        pages.append(
+            {
+                "title": node.get("text") or href,
+                "href": href,
+                "content_api_url": (
+                    "https://developer.salesforce.com/docs/get_document_content/"
+                    f"{deliverable}/{href}/{locale}/{doc_version}"
+                ),
+                "source_url": urljoin(
+                    "https://developer.salesforce.com/",
+                    f"docs/{version_url}/{deliverable}/{href}",
+                ),
+            }
+        )
+    return pages
+
+
+def _walk_toc(nodes: list[dict]) -> list[dict]:
+    flattened: list[dict] = []
+    for node in nodes:
+        flattened.append(node)
+        flattened.extend(_walk_toc(node.get("children") or []))
+    return flattened
 
 
 if __name__ == "__main__":

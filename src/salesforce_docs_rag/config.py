@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
+    answer_provider: str = "local"
+    openai_chat_model: str = "gpt-4.1-mini"
 
     weaviate_url: str = "http://localhost:8080"
     weaviate_api_key: str | None = None
