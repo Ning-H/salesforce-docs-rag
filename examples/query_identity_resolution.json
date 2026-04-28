@@ -1,0 +1,7 @@
+{
+  "query": "How do I set up identity resolution in Data Cloud?",
+  "top_k": 5,
+  "filters": {
+    "product_area": "Data Cloud"
+  }
+}
