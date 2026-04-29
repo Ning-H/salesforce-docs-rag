@@ -1,4 +1,18 @@
 services:
+  airflow-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.27.10
     ports:
@@ -16,12 +30,74 @@ services:
   api:
     build: .
     env_file: .env
+    environment:
+      WEAVIATE_URL: http://weaviate:8080
     depends_on:
       - weaviate
     ports:
       - "8000:8000"
     volumes:
+      - ./src:/app/src
       - ./data:/app/data
+
+  airflow-init:
+    build: .
+    env_file: .env
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      weaviate:
+        condition: service_started
+    environment: &airflow-common-env
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__DAGS_FOLDER: /app/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
+      AIRFLOW__LOGGING__BASE_LOG_FOLDER: /app/logs
+      AIRFLOW_HOME: /app
+      WEAVIATE_URL: http://weaviate:8080
+      PYTHONPATH: /app/src
+    volumes: &airflow-common-volumes
+      - ./src:/app/src
+      - ./scrapy_project:/app/scrapy_project
+      - ./dags:/app/dags
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: >
+      bash -c "airflow db migrate &&
+      airflow users create
+      --username admin
+      --password admin
+      --firstname Portfolio
+      --lastname Admin
+      --role Admin
+      --email admin@example.com || true"
+
+  airflow-webserver:
+    build: .
+    env_file: .env
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *airflow-common-env
+    ports:
+      - "8081:8080"
+    volumes: *airflow-common-volumes
+    command: airflow webserver
+
+  airflow-scheduler:
+    build: .
+    env_file: .env
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *airflow-common-env
+    volumes: *airflow-common-volumes
+    command: airflow scheduler
 
 volumes:
   weaviate_data:
+  airflow_postgres_data:

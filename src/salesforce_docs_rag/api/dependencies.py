@@ -3,6 +3,7 @@ from functools import lru_cache
 from salesforce_docs_rag.answering import AnswerSynthesizer
 from salesforce_docs_rag.config import get_settings
 from salesforce_docs_rag.embeddings import get_embedding_provider
+from salesforce_docs_rag.reranking import HybridReranker
 from salesforce_docs_rag.storage import WeaviateVectorStore
 
 
@@ -24,3 +25,8 @@ def embedding_provider():
 @lru_cache
 def answer_synthesizer() -> AnswerSynthesizer:
     return AnswerSynthesizer(get_settings())
+
+
+@lru_cache
+def hybrid_reranker() -> HybridReranker:
+    return HybridReranker()

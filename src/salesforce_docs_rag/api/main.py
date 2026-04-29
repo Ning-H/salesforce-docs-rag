@@ -7,6 +7,7 @@ from salesforce_docs_rag.answering import AnswerSynthesizer
 from salesforce_docs_rag.api.dependencies import (
     answer_synthesizer,
     embedding_provider,
+    hybrid_reranker,
     vector_store,
 )
 from salesforce_docs_rag.api.schemas import (
@@ -19,6 +20,8 @@ from salesforce_docs_rag.api.schemas import (
 from salesforce_docs_rag.config import get_settings
 from salesforce_docs_rag.embeddings.base import EmbeddingProvider
 from salesforce_docs_rag.logging import configure_logging
+from salesforce_docs_rag.models import SearchResult
+from salesforce_docs_rag.reranking import HybridReranker
 from salesforce_docs_rag.storage import WeaviateVectorStore
 
 
@@ -53,9 +56,9 @@ async def query(
     request: QueryRequest,
     embedder: Annotated[EmbeddingProvider, Depends(embedding_provider)],
     store: Annotated[WeaviateVectorStore, Depends(vector_store)],
+    reranker: Annotated[HybridReranker, Depends(hybrid_reranker)],
 ) -> QueryResponse:
-    query_vector = (await embedder.embed([request.query]))[0]
-    results = store.search(query_vector=query_vector, top_k=request.top_k, filters=request.filters)
+    results = await retrieve_results(request, embedder, store, reranker)
     return QueryResponse(query=request.query, results=results)
 
 
@@ -65,9 +68,9 @@ async def answer(
     embedder: Annotated[EmbeddingProvider, Depends(embedding_provider)],
     store: Annotated[WeaviateVectorStore, Depends(vector_store)],
     synthesizer: Annotated[AnswerSynthesizer, Depends(answer_synthesizer)],
+    reranker: Annotated[HybridReranker, Depends(hybrid_reranker)],
 ) -> AnswerResponse:
-    query_vector = (await embedder.embed([request.query]))[0]
-    results = store.search(query_vector=query_vector, top_k=request.top_k, filters=request.filters)
+    results = await retrieve_results(request, embedder, store, reranker)
     answer_text, citations = await synthesizer.answer(request.query, results)
     return AnswerResponse(
         query=request.query,
@@ -75,3 +78,21 @@ async def answer(
         citations=citations,
         retrieved_results=results,
     )
+
+
+async def retrieve_results(
+    request: QueryRequest,
+    embedder: EmbeddingProvider,
+    store: WeaviateVectorStore,
+    reranker: HybridReranker,
+) -> list[SearchResult]:
+    query_vector = (await embedder.embed([request.query]))[0]
+    candidate_k = request.candidate_k or (min(100, max(request.top_k, request.top_k * 4)))
+    candidates = store.search(
+        query_vector=query_vector,
+        top_k=candidate_k if request.rerank else request.top_k,
+        filters=request.filters,
+    )
+    if request.rerank:
+        return reranker.rerank(request.query, candidates, top_k=request.top_k)
+    return candidates

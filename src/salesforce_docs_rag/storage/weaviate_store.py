@@ -10,7 +10,18 @@ from salesforce_docs_rag.models import DocumentChunk, SearchFilters, SearchResul
 
 
 def _connect(url: str, api_key: str | None = None):
+    if "://" not in url and ("weaviate.cloud" in url or "weaviate.network" in url):
+        url = f"https://{url}"
+
     parsed = urlparse(url)
+    if api_key and parsed.scheme == "https":
+        from weaviate.classes.init import Auth
+
+        return weaviate.connect_to_weaviate_cloud(
+            cluster_url=url,
+            auth_credentials=Auth.api_key(api_key),
+        )
+
     host = parsed.hostname or "localhost"
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
     secure = parsed.scheme == "https"

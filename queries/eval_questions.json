@@ -1,0 +1,64 @@
+[
+  {
+    "id": "apex_tests",
+    "query": "How do I write Apex tests?",
+    "expected_url_contains": [
+      "apex_intro_writing_tests",
+      "apex_qs_test",
+      "apex_classes_annotation_isTest",
+      "apex_testing"
+    ]
+  },
+  {
+    "id": "see_all_data",
+    "query": "When should I use SeeAllData true in Apex tests?",
+    "expected_url_contains": [
+      "apex_classes_annotation_isTest",
+      "apex_testing_data"
+    ]
+  },
+  {
+    "id": "apex_bulk_limits",
+    "query": "How should Apex code handle bulk records and governor limits?",
+    "expected_url_contains": [
+      "apex_intro_apex_limitation",
+      "apex_gov_limits"
+    ]
+  },
+  {
+    "id": "rest_auth",
+    "query": "How do I authenticate to the Salesforce REST API?",
+    "expected_url_contains": [
+      "intro_rest",
+      "quickstart_oauth",
+      "oauth"
+    ]
+  },
+  {
+    "id": "soql_sosl_choice",
+    "query": "When should I use SOQL versus SOSL?",
+    "expected_url_contains": [
+      "sforce_api_calls_soql_sosl_intro",
+      "soql_sosl",
+      "sosl"
+    ]
+  },
+  {
+    "id": "apex_quick_start",
+    "query": "How do I create a simple Apex class and trigger?",
+    "expected_url_contains": [
+      "apex_qs_HelloWorld",
+      "apex_qs_class",
+      "apex_qs_trigger"
+    ]
+  },
+  {
+    "id": "apex_data_types",
+    "query": "What data types and collections does Apex support?",
+    "expected_url_contains": [
+      "langCon_apex_datatypes_variables_intro",
+      "langCon_apex_data_types",
+      "langCon_apex_collections"
+    ]
+  }
+]

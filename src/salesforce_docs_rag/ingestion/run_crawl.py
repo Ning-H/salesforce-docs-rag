@@ -1,7 +1,11 @@
 import json
+import logging
 import sys
+import time
+from itertools import zip_longest
 from pathlib import Path
 from urllib import request
+from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin
 
 from scrapy.crawler import CrawlerProcess
@@ -12,6 +16,8 @@ from salesforce_docs_rag.crawler.html_extractor import extract_document
 from salesforce_docs_rag.io import write_jsonl
 from salesforce_docs_rag.logging import configure_logging
 from salesforce_docs_rag.models import RawDocument
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -67,38 +73,75 @@ def main() -> None:
 def crawl_salesforce_docs_api(seed_urls: list[str], output_path: Path, max_pages: int) -> int:
     documents: list[RawDocument] = []
     seen_pages: set[str] = set()
-    for guide_url in seed_urls:
-        guide_payload = _fetch_json(guide_url)
-        for page in _iter_guide_pages(guide_payload):
+    guide_payloads = [_fetch_json(guide_url) for guide_url in seed_urls]
+    page_groups = [_iter_guide_pages(guide_payload) for guide_payload in guide_payloads]
+    guide_by_api_url = {
+        page["content_api_url"]: guide_payload
+        for guide_payload, pages in zip(guide_payloads, page_groups, strict=True)
+        for page in pages
+    }
+
+    for page_tuple in zip_longest(*page_groups):
+        for page in page_tuple:
+            if page is None:
+                continue
             if len(documents) >= max_pages:
                 return write_jsonl(output_path, documents)
-            if page["content_api_url"] in seen_pages:
+            document = _fetch_page_document(page, guide_by_api_url[page["content_api_url"]])
+            if document is None or page["content_api_url"] in seen_pages:
                 continue
             seen_pages.add(page["content_api_url"])
-            page_payload = _fetch_json(page["content_api_url"])
-            content = page_payload.get("content") or ""
-            title = page_payload.get("title") or page["title"]
-            html = f"<main><h1>{title}</h1>{content}</main>"
-            document = extract_document(page["source_url"], html)
-            if document is None:
-                continue
-            version = guide_payload.get("version") or {}
-            document.release_version = version.get("version_text") or document.release_version
-            document.metadata.update(
-                {
-                    "content_document_id": page_payload.get("id") or page["href"],
-                    "deliverable": guide_payload.get("deliverable"),
-                    "guide_title": guide_payload.get("doc_title") or guide_payload.get("title"),
-                    "pdf_url": guide_payload.get("pdf_url"),
-                }
-            )
             documents.append(document)
+            if len(documents) % 25 == 0:
+                logger.info("Fetched %s Salesforce documentation pages", len(documents))
     return write_jsonl(output_path, documents)
 
 
-def _fetch_json(url: str) -> dict:
-    with request.urlopen(url, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+def _fetch_page_document(page: dict[str, str], guide_payload: dict) -> RawDocument | None:
+    try:
+        page_payload = _fetch_json(page["content_api_url"])
+    except (HTTPError, TimeoutError, URLError) as exc:
+        logger.warning(
+            "Skipping Salesforce doc page after fetch failure: %s (%s)",
+            page["source_url"],
+            exc,
+        )
+        return None
+
+    content = page_payload.get("content") or ""
+    title = page_payload.get("title") or page["title"]
+    html = f"<main><h1>{title}</h1>{content}</main>"
+    document = extract_document(page["source_url"], html)
+    if document is None:
+        return None
+
+    version = guide_payload.get("version") or {}
+    document.release_version = version.get("version_text") or document.release_version
+    document.metadata.update(
+        {
+            "content_document_id": page_payload.get("id") or page["href"],
+            "deliverable": guide_payload.get("deliverable"),
+            "guide_title": guide_payload.get("doc_title") or guide_payload.get("title"),
+            "pdf_url": guide_payload.get("pdf_url"),
+        }
+    )
+    return document
+
+
+def _fetch_json(url: str, attempts: int = 2, timeout_seconds: int = 10) -> dict:
+    last_error: HTTPError | TimeoutError | URLError | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            with request.urlopen(url, timeout=timeout_seconds) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except (HTTPError, TimeoutError, URLError) as exc:
+            last_error = exc
+            if attempt == attempts:
+                break
+            time.sleep(attempt)
+    if last_error is None:
+        raise RuntimeError(f"Unable to fetch JSON from {url}")
+    raise last_error
 
 
 def _iter_guide_pages(guide_payload: dict) -> list[dict[str, str]]:

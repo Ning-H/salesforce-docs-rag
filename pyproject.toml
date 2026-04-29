@@ -13,7 +13,9 @@ dependencies = [
   "pydantic>=2.7",
   "pydantic-settings>=2.3",
   "python-dotenv>=1.0",
+  "requests>=2.31",
   "scrapy>=2.11",
+  "streamlit>=1.38",
   "tenacity>=8.2",
   "uvicorn[standard]>=0.30",
   "weaviate-client>=4.7",
@@ -26,7 +28,7 @@ dev = [
   "ruff>=0.5",
 ]
 airflow = [
-  "apache-airflow>=2.9,<3.0",
+  "apache-airflow[postgres]>=2.9,<3.0",
 ]
 
 [project.scripts]

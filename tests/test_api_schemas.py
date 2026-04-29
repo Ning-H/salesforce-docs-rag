@@ -8,6 +8,8 @@ def test_query_request_defaults():
     request = QueryRequest(query="SOQL relationship query examples")
 
     assert request.top_k == 5
+    assert request.rerank is False
+    assert request.candidate_k is None
     assert request.filters is None
 
 
@@ -20,6 +22,7 @@ def test_answer_request_uses_query_contract():
     request = AnswerRequest(query="How do I write Apex tests?")
 
     assert request.top_k == 5
+    assert request.rerank is True
 
 
 def test_health_response_includes_answer_provider():

@@ -6,6 +6,8 @@ from salesforce_docs_rag.models import SearchFilters, SearchResult
 class QueryRequest(BaseModel):
     query: str = Field(min_length=3)
     top_k: int = Field(default=5, ge=1, le=25)
+    candidate_k: int | None = Field(default=None, ge=1, le=100)
+    rerank: bool = False
     filters: SearchFilters | None = None
 
 
@@ -21,7 +23,7 @@ class Citation(BaseModel):
 
 
 class AnswerRequest(QueryRequest):
-    pass
+    rerank: bool = True
 
 
 class AnswerResponse(BaseModel):
