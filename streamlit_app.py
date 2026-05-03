@@ -4,6 +4,7 @@ from typing import Any
 
 import requests
 import streamlit as st
+from tenacity import RetryError
 
 from salesforce_docs_rag.answering import AnswerSynthesizer
 from salesforce_docs_rag.api.schemas import AnswerRequest
@@ -153,6 +154,14 @@ def main() -> None:
         with st.spinner("Retrieving Salesforce docs and generating a grounded answer..."):
             try:
                 data = answer_question(payload)
+            except RetryError as exc:
+                st.error(
+                    "OpenAI embedding failed after retries. Check Streamlit secrets for "
+                    "`OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL`, and OpenAI billing/quota."
+                )
+                with st.expander("Technical detail"):
+                    st.code(str(exc.last_attempt.exception()))
+                st.stop()
             except (requests.RequestException, ValueError) as exc:
                 st.error(f"Request failed: {exc}")
                 st.stop()
