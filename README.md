@@ -4,6 +4,8 @@ Production-grade retrieval infrastructure over public Salesforce documentation, 
 
 The system crawls public Salesforce docs, chunks content by documentation section, embeds chunks, stores vectors in Weaviate, and exposes a FastAPI semantic retrieval API with filters for product area, documentation type, release version, and source URL.
 
+Live demo: [salesforce-docs-rag-ninghan.streamlit.app](https://salesforce-docs-rag-ninghan.streamlit.app/)
+
 ## Architecture
 
 ```mermaid
@@ -59,6 +61,8 @@ The Streamlit app supports two runtime modes:
 - `Direct` mode: leave `RAG_API_BASE_URL` unset; Streamlit connects directly to Weaviate and OpenAI. This is the Streamlit Community Cloud deployment mode.
 
 ## Streamlit Community Cloud Demo
+
+Current hosted demo: [https://salesforce-docs-rag-ninghan.streamlit.app/](https://salesforce-docs-rag-ninghan.streamlit.app/)
 
 For a public demo, host `streamlit_app.py` on [Streamlit Community Cloud](https://streamlit.io/cloud). Community Cloud installs dependencies from `requirements.txt` and lets you paste secrets into app settings instead of committing credentials.
 
