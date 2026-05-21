@@ -5,6 +5,7 @@ from typing import Any
 import requests
 import streamlit as st
 from tenacity import RetryError
+from weaviate.exceptions import WeaviateBaseError
 
 from salesforce_docs_rag.answering import AnswerSynthesizer
 from salesforce_docs_rag.api.schemas import AnswerRequest
@@ -161,6 +162,16 @@ def main() -> None:
                 )
                 with st.expander("Technical detail"):
                     st.code(str(exc.last_attempt.exception()))
+                st.stop()
+            except WeaviateBaseError as exc:
+                st.error(
+                    "Weaviate connection failed. In Streamlit secrets, check that "
+                    "`WEAVIATE_URL` is the cluster REST endpoint or hostname, "
+                    "`WEAVIATE_API_KEY` is current, and `WEAVIATE_COLLECTION` exists."
+                )
+                status_code = getattr(exc, "status_code", None)
+                if status_code:
+                    st.info(f"Weaviate returned HTTP status {status_code}.")
                 st.stop()
             except (requests.RequestException, ValueError) as exc:
                 st.error(f"Request failed: {exc}")

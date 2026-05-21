@@ -9,16 +9,26 @@ from weaviate.classes.query import Filter
 from salesforce_docs_rag.models import DocumentChunk, SearchFilters, SearchResult
 
 
-def _connect(url: str, api_key: str | None = None):
-    if "://" not in url and ("weaviate.cloud" in url or "weaviate.network" in url):
-        url = f"https://{url}"
+def _normalize_weaviate_url(url: str) -> tuple[str, bool]:
+    raw_url = url.strip()
+    if "://" not in raw_url and ("weaviate.cloud" in raw_url or "weaviate.network" in raw_url):
+        raw_url = f"https://{raw_url}"
 
-    parsed = urlparse(url)
-    if api_key and parsed.scheme == "https":
+    parsed = urlparse(raw_url)
+    host = parsed.hostname or raw_url
+    is_cloud = host.endswith((".weaviate.cloud", ".weaviate.network"))
+    return (host if is_cloud else raw_url), is_cloud
+
+
+def _connect(url: str, api_key: str | None = None):
+    normalized_url, is_cloud = _normalize_weaviate_url(url)
+
+    parsed = urlparse(normalized_url)
+    if api_key and is_cloud:
         from weaviate.classes.init import Auth
 
         return weaviate.connect_to_weaviate_cloud(
-            cluster_url=url,
+            cluster_url=normalized_url,
             auth_credentials=Auth.api_key(api_key),
         )
 

@@ -85,6 +85,8 @@ EMBEDDING_PROVIDER = "openai"
 ANSWER_PROVIDER = "openai"
 ```
 
+Use the Weaviate cluster REST endpoint or hostname for `WEAVIATE_URL`, not the Weaviate Console dashboard URL. Both `https://your-cluster.weaviate.network` and `your-cluster.weaviate.network` are accepted.
+
 Do not commit `.streamlit/secrets.toml`; only commit `.streamlit/secrets.toml.example`.
 
 To load the current local corpus into Weaviate Cloud, temporarily set `WEAVIATE_URL` and `WEAVIATE_API_KEY` to your cloud cluster values and run:
